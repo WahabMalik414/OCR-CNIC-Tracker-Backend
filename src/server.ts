@@ -1,14 +1,10 @@
 import express, { Express, Request, Response } from "express";
 const bodyParser = require("body-parser");
-
 const cors = require("cors");
 import processImages from "./ocrModule";
 import expressAsyncHandler from "express-async-handler";
 import dotenv from "dotenv";
-import fs from "fs";
-import path from "path";
 import { PrismaClient } from "@prisma/client";
-import { log } from "console";
 
 dotenv.config();
 
@@ -70,6 +66,22 @@ app.post(
     }
   })
 );
+
+app.get(
+  "/view",async(req:Request,res:Response)=>{
+    console.log("request arrived!")
+    try {
+      const allRecords = await db.data.findMany();
+      console.log(allRecords);
+      res.status(200).json(allRecords);
+    } catch (error) {
+      res.status(404).json(error)
+    }
+   
+  }
+  
+);
+
 
 app.listen(port, () => {
   console.log(`[Server]: I am running at https://localhost:${port}`);
