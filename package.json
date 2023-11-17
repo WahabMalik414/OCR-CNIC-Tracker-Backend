@@ -7,7 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc",
     "start": "ts-node-dev ./src/server.ts",
-    "dev": "npx ts-node script.ts",
+    "dev": "ts-node-dev ./src/server.ts",
     "predev": "prisma generate"
   },
   "author": "",
