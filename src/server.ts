@@ -5,6 +5,7 @@ import processImages from "./ocrModule";
 import expressAsyncHandler from "express-async-handler";
 import dotenv from "dotenv";
 import { PrismaClient } from "@prisma/client";
+import path = require("path");
 
 dotenv.config();
 
@@ -26,7 +27,7 @@ interface WorkerInput {
 const db = new PrismaClient();
 
 app.get("/", (req: Request, res: Response) => {
-  res.send("Hello, this is Express + TypeScript");
+  res.send("Express server is working!");
 });
 
 const storage = multer.diskStorage({
@@ -38,6 +39,9 @@ const storage = multer.diskStorage({
   ) => {
     const originalName = file.originalname;
     callback(null, originalName);
+
+    //const ext = path.extname(originalName);
+    //callback(null, originalName + ext);
   },
 });
 
@@ -61,6 +65,26 @@ const multi_upload = multer({
   },
 }).array("files");
 
+const multi_upload2 = multer({
+  storage,
+  fileFilter: (req:Request, file:any, cb:Function) => {
+    const ext = path.extname(file.originalName).toLowerCase();
+    const mimetype = file.mimetype;
+    if (
+      ext !== '.png' && 
+      ext !== '.jpg' && 
+      ext !== '.jpeg' && 
+      mimetype !== 'image/png' && 
+      mimetype !== 'image/jpg' && 
+      mimetype !== 'image/jpeg'
+    ) {
+      const err = new Error("Only .png, .jpg and .jpeg format allowed!");
+      err.name = "ExtensionError";
+      return cb(err);
+    }
+    cb(null, true);
+  },
+ }).array("files");
 // app.post(
 //   "/process",
 //   //upload.array("files"),
@@ -86,13 +110,29 @@ const multi_upload = multer({
 //     }
 //   })
 // );
+// Define the path to the "input" folder
+const inputFolderPath = path.resolve(__dirname, '../input');
 
+// Serve a specific file based on the request
+app.get('/api/files/:fileName', (req, res) => {
+  const fileName = req.params.fileName;
+  const filePath = path.join(inputFolderPath, fileName);
+  console.log(filePath)
+
+  // Use res.sendFile to send the file
+  res.sendFile(filePath, (err) => {
+    if (err) {
+      // Handle errors (e.g., file not found)
+      res.status(404).send('File not found');
+    }
+  });
+});
 app.post(
   "/process",
   expressAsyncHandler(async (req, res) => {
     const uploadPromise = new Promise((resolve, reject) => {
       multi_upload(req, res, function (err: any) {
-        if (err instanceof multer.MulterError) {
+        if (err) {
           reject({ message: `Multer uploading error: ${err.message}` });
         } else if (err) {
           if (err.name == "ExtensionError") {
@@ -130,7 +170,6 @@ app.post(
 );
 
 app.get("/view", async (req: Request, res: Response) => {
-  console.log("request arrived!");
   try {
     const allRecords = await db.data.findMany();
     console.log(allRecords);
@@ -139,6 +178,10 @@ app.get("/view", async (req: Request, res: Response) => {
     res.status(404).json(error);
   }
 });
+
+app.get("/open",async(req:Request,res:Response)=>{
+
+})
 
 app.listen(port, () => {
   console.log(`[Server]: I am running at https://localhost:${port}`);
