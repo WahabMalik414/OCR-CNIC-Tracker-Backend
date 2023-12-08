@@ -83,10 +83,22 @@ app.get("/view", async (req: Request, res: Response) => {
   }
 });
 
-app.get("/open",async(req:Request,res:Response)=>{
+const inputFolderPath = path.resolve(__dirname, '../input');
 
-})
+// Serve a specific file based on the request
+app.get('/api/files/:fileName', (req, res) => {
+  const fileName = req.params.fileName;
+  const filePath = path.join(inputFolderPath, fileName);
+  console.log(filePath)
 
+  // Use res.sendFile to send the file
+  res.sendFile(filePath, (err) => {
+    if (err) {
+      // Handle errors (e.g., file not found)
+      res.status(404).send('File not found');
+    }
+  });
+});
 app.listen(port, () => {
   console.log(`[Server]: I am running at https://localhost:${port}`);
 });
