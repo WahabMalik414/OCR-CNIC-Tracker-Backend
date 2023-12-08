@@ -30,24 +30,6 @@ export default async function insert(
     return;
   }
 
-  /*
-  for (const extractedData of matchedList) {
-    await db.data.upsert({
-      where: { fileHash,extractedData },
-      update: { extractedData, createdDate, modifiedDate },
-      create: {
-        fileHash,
-        fileName: file,
-        filePath: inputDir,
-        extractedData,
-        createdDate,
-        modifiedDate,
-      },
-    });
-    logs.push(`Inserted data from ${file}: ${matchedList}`);
-  }
-  return;
-*/
   console.log(matchedList);
 
   for (const extractedData of matchedList) {
