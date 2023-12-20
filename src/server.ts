@@ -5,7 +5,7 @@ import processImages from "./ocrModule";
 import dotenv from "dotenv";
 import { PrismaClient } from "@prisma/client";
 import path = require("path");
-
+import fs from "fs";
 dotenv.config();
 
 const app: Express = express();
@@ -43,34 +43,27 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-app.post(
-  "/process",
-  upload.array("files"),
-  async (req, res) => {
-    await upload.single("files");
+app.post("/process", upload.array("files"), async (req, res) => {
+  await upload.single("files");
 
-    const files = req.files as Express.Multer.File[]; // Files are available here
+  const files = req.files as Express.Multer.File[]; // Files are available here
 
-    const filenames = files.map((file: any) => file.originalname);
-    console.log(filenames);
+  const filenames = files.map((file: any) => file.originalname);
+  console.log(filenames);
 
-    const workerInput: WorkerInput = {
-      inputDir: INPUT_DIR,
-      outputDir: OUTPUT_DIR,
-      files: filenames,
-    };
+  const workerInput: WorkerInput = {
+    inputDir: INPUT_DIR,
+    outputDir: OUTPUT_DIR,
+    files: filenames,
+  };
 
-    try {
-      let logs = await processImages(workerInput);
-      res.status(200).json({ logs });
-    } catch (error) {
-      res.status(500).json({ error: "An error occurred" });
-    }
+  try {
+    let logs = await processImages(workerInput);
+    res.status(200).send("Success");
+  } catch (error) {
+    res.status(500).json({ error: "An error occurred" });
   }
-);
-
-
-
+});
 
 app.get("/view", async (req: Request, res: Response) => {
   try {
@@ -82,19 +75,35 @@ app.get("/view", async (req: Request, res: Response) => {
   }
 });
 
-const inputFolderPath = path.resolve(__dirname, '../input');
+const inputFolderPath = path.resolve(__dirname, "../input");
 
-app.get('/api/files/:fileName', (req, res) => {
+app.get("/api/files/:fileName", (req, res) => {
   const fileName = req.params.fileName;
   const filePath = path.join(inputFolderPath, fileName);
-  console.log(filePath)
+  console.log(filePath);
 
   res.sendFile(filePath, (err) => {
     if (err) {
-      res.status(404).send('File not found');
+      res.status(404).send("File not found");
     }
   });
 });
+app.get("/api/delete/:fileHash", async (req, res) => {
+  const fileHash = req.params.fileHash;
+  try {
+    await db.data.deleteMany({
+      where: {
+        fileHash: fileHash,
+      },
+    });
+
+    res.status(200).send("Records deleted successfully!");
+  } catch (dbError) {
+    console.error("Error deleting records from the database:", dbError);
+    res.status(500).send("Internal Server Error");
+  }
+});
+
 app.listen(port, () => {
   console.log(`[Server]: I am running at https://localhost:${port}`);
 });
