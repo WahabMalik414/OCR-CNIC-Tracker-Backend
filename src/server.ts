@@ -1,18 +1,26 @@
 import express, { Express, Request, Response } from "express";
-const bodyParser = require("body-parser");
-const cors = require("cors");
+import bodyParser from "body-parser";
+import cors from "cors";
 import processImages from "./ocrModule";
 import dotenv from "dotenv";
 import { PrismaClient } from "@prisma/client";
-import path = require("path");
+import path from "path";
+import bcrypt from "bcrypt";
 import fs from "fs";
+import createSecretToken from "./secretToken";
 dotenv.config();
-
+import cookieParser from "cookie-parser";
 const app: Express = express();
 app.use(express.json());
 app.use(bodyParser.json());
-
-app.use(cors());
+app.use(cookieParser());
+app.use(
+  cors({
+    origin: ["http://localhost:5173"],
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
+  })
+);
 const port = 3005;
 const INPUT_DIR = process.env.INPUT_DIR || "./input";
 const OUTPUT_DIR = process.env.OUTPUT_DIR || "./output";
@@ -24,6 +32,7 @@ interface WorkerInput {
   files: string[];
 }
 const db = new PrismaClient();
+const hashedPassword = bcrypt.hashSync("admin@hrd", 12);
 
 app.get("/", (req: Request, res: Response) => {
   res.send("Express server is working!");
@@ -42,6 +51,36 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage: storage });
+
+app.post("/login", async (req, res, next) => {
+  try {
+    const { user, password } = req.body;
+
+    if (!user || !password) {
+      return res.status(404).json({ message: "All fields are required" });
+    }
+
+    if (user !== "Admin") {
+      console.log("Wrong")
+      return res.status(404).json({ message: "Incorrect user name" });
+    }
+    const auth = await bcrypt.compare(password, hashedPassword);
+    if (!auth) {
+      return res.status(404).json({ message: "Incorrect password" });
+    }
+
+    const token = createSecretToken(user);
+
+    res.cookie("token", token, {
+      httpOnly: true,
+    });
+    res
+      .status(201)
+      .json({ message: "Successfully signed in!", sucess: "true", user });
+  } catch (error) {
+    console.log(error);
+  }
+});
 
 app.post("/process", upload.array("files"), async (req, res) => {
   await upload.single("files");
