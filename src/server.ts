@@ -7,6 +7,8 @@ import { PrismaClient } from "@prisma/client";
 import path from "path";
 import bcrypt from "bcrypt";
 import fs from "fs";
+import jwt from "jsonwebtoken";
+
 import createSecretToken from "./secretToken";
 dotenv.config();
 import cookieParser from "cookie-parser";
@@ -34,7 +36,24 @@ interface WorkerInput {
 const db = new PrismaClient();
 const hashedPassword = bcrypt.hashSync("admin@hrd", 12);
 
-app.get("/", (req: Request, res: Response) => {
+interface JwtPayload {
+  user: string; // Replace string with the actual type of your user property
+  // other properties from your JWT payload, if any
+}
+const authorization = (req: RequestWithUser, res: Response, next: Function) => {
+  const token = req.cookies.token;
+  if (!token) {
+    return res.status(403).json({ message: "Forbidden!" });
+  }
+  try {
+    const data = jwt.verify(token, "CNsi*SNDk") as JwtPayload;
+    req.user = data.user;
+    return next();
+  } catch (error) {
+    console.log(error);
+  }
+};
+app.get("/", authorization, (req: Request, res: Response) => {
   res.send("Express server is working!");
 });
 
@@ -49,9 +68,12 @@ const storage = multer.diskStorage({
     callback(null, originalName);
   },
 });
+interface RequestWithUser extends Request {
+  user?: any;
+}
 
 const upload = multer({ storage: storage });
-
+//#TODO show these to users on frontend.
 app.post("/login", async (req, res, next) => {
   try {
     const { user, password } = req.body;
@@ -61,7 +83,6 @@ app.post("/login", async (req, res, next) => {
     }
 
     if (user !== "Admin") {
-      console.log("Wrong")
       return res.status(404).json({ message: "Incorrect user name" });
     }
     const auth = await bcrypt.compare(password, hashedPassword);
@@ -76,16 +97,23 @@ app.post("/login", async (req, res, next) => {
     });
     res
       .status(201)
-      .json({ message: "Successfully signed in!", sucess: "true", user });
+      .json({ message: "Successfully signed in!", success: "true", user });
   } catch (error) {
     console.log(error);
   }
 });
 
-app.post("/process", upload.array("files"), async (req, res) => {
+app.get("/logout", (req: Request, res: Response) => {
+  res.clearCookie("token", {
+    httpOnly: true,
+  });
+  res.end();
+});
+
+app.post("/process", authorization, upload.array("files"), async (req, res) => {
   await upload.single("files");
 
-  const files = req.files as Express.Multer.File[]; // Files are available here
+  const files = req.files as Express.Multer.File[];
 
   const filenames = files.map((file: any) => file.originalname);
   console.log(filenames);
@@ -104,7 +132,7 @@ app.post("/process", upload.array("files"), async (req, res) => {
   }
 });
 
-app.get("/view", async (req: Request, res: Response) => {
+app.get("/view", authorization, async (req: Request, res: Response) => {
   try {
     const allRecords = await db.data.findMany();
     console.log(allRecords);
@@ -116,7 +144,7 @@ app.get("/view", async (req: Request, res: Response) => {
 
 const inputFolderPath = path.resolve(__dirname, "../input");
 
-app.get("/api/files/:fileName", (req, res) => {
+app.get("/api/files/:fileName", authorization, (req, res) => {
   const fileName = req.params.fileName;
   const filePath = path.join(inputFolderPath, fileName);
   console.log(filePath);
@@ -127,7 +155,8 @@ app.get("/api/files/:fileName", (req, res) => {
     }
   });
 });
-app.get("/api/delete/:fileHash", async (req, res) => {
+app.get("/api/delete/:fileHash", authorization, async (req, res) => {
+  console.log("here");
   const fileHash = req.params.fileHash;
   try {
     await db.data.deleteMany({
